@@ -1,0 +1,10 @@
+[package]
+name = "image-host"
+version = "0.1.0"
+authors = ["Kurt Kartaltepe <kkartalepe@gmail.com>"]
+
+[dependencies]
+iron  = "*"
+router  = "*"
+params  = "*"
+hyper = "*"
