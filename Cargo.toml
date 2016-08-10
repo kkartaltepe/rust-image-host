@@ -2,9 +2,25 @@
 name = "image-host"
 version = "0.1.0"
 authors = ["Kurt Kartaltepe <kkartalepe@gmail.com>"]
+links = "user32 gdi32"
+build = "build.rs"
 
 [dependencies]
 iron  = "*"
 router  = "*"
 params  = "*"
 hyper = "*"
+
+# Included in rust-openssl https://github.com/sfackler/rust-openssl/blob/master/openssl-sys/Cargo.toml but dont cause rustc to link against user32 or gdi32 when uncommented.
+# [target.i686-pc-windows-gnu.dependencies]
+# user32-sys = "0.2"
+# gdi32-sys = "0.2"
+# [target.x86_64-pc-windows-gnu.dependencies]
+# user32-sys = "0.2"
+# gdi32-sys = "0.2"
+# [target.i686-pc-windows-msvc.dependencies]
+# user32-sys = "0.2"
+# gdi32-sys = "0.2"
+# [target.x86_64-pc-windows-msvc.dependencies]
+# user32-sys = "0.2"
+# gdi32-sys = "0.2"

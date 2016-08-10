@@ -55,7 +55,7 @@ fn upload(req: &mut Request) -> IronResult<Response> {
     if auth_err.is_some() { return Ok(auth_err.unwrap()); }
 
     let mut image = Vec::with_capacity(10);
-    let max_len: usize = 8*1024*1024;
+    let max_len: u64 = 8*1024*1024;
 
     match req.get_ref::<Params>() {
         Ok(params) => {
