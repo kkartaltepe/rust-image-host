@@ -48,7 +48,7 @@ fn image(req: &mut Request) -> IronResult<Response> {
 
     let timestamp = match fs::metadata(image) {
         Ok(meta) => format!("{:X}", meta.modified().unwrap().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs()),
-        _ => return Ok(Response::with((status::NotFound, "Image not found\n"))),
+        Err(e) => return Ok(Response::with((status::InternalServerError, format!("Error getting image timestamp: {:#?}\n", e)))),
     };
 
     if Some(timestamp.as_ref()) == router.find("ETag") {
