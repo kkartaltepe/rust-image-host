@@ -8,7 +8,7 @@ extern crate liquid;
 use iron::prelude::*;
 use iron::status;
 use iron::modifiers::Header;
-use hyper::header::{ETag, EntityTag};
+use hyper::header::{ETag, EntityTag, IfNoneMatch};
 use iron::mime::Mime;
 use router::Router;
 use params::{Params,Value};
@@ -51,8 +51,15 @@ fn image(req: &mut Request) -> IronResult<Response> {
         Err(e) => return Ok(Response::with((status::InternalServerError, format!("Error getting image timestamp: {:#?}\n", e)))),
     };
     let etag_header = Header(ETag(EntityTag::new(true, timestamp.clone())));
-    match router.find("If-None-Match") {
-        Some(p) if p == timestamp => return Ok(Response::with((status::NotModified, etag_header))),
+    match req.headers.get::<IfNoneMatch>() {
+        Some(h) => match *h {
+            IfNoneMatch::Any => return Ok(Response::with((status::NotModified, etag_header))),
+            IfNoneMatch::Items(ref v) => {
+                if v.contains(&EntityTag::new(true, timestamp.clone())) {
+                    return Ok(Response::with((status::NotModified, etag_header)));
+                }
+            },
+        } ,
         _ => {},
     };
     
