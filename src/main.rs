@@ -50,9 +50,9 @@ fn image(req: &mut Request) -> IronResult<Response> {
         Ok(meta) => format!("{:X}", meta.modified().unwrap().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs()),
         Err(e) => return Ok(Response::with((status::InternalServerError, format!("Error getting image timestamp: {:#?}\n", e)))),
     };
-
+    let etag_header = Header(ETag(EntityTag::new(true, timestamp.clone())));
     if Some(timestamp.as_ref()) == router.find("ETag") {
-        return Ok(Response::with((status::NotModified, Header(ETag(EntityTag::new(true, timestamp))))));
+        return Ok(Response::with((status::NotModified, etag_header)));
     }
     
     let mut f = match File::open(format!("images/{}", image)) {
@@ -61,7 +61,7 @@ fn image(req: &mut Request) -> IronResult<Response> {
     };
     let mut data = Vec::new();
     f.read_to_end(&mut data).unwrap();
-    return Ok(Response::with((status::Ok, mime, data)));
+    return Ok(Response::with((status::Ok, mime, etag_header, data)));
 }
 
 fn upload(req: &mut Request) -> IronResult<Response> {
