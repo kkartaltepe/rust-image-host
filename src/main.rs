@@ -7,6 +7,8 @@ extern crate liquid;
 
 use iron::prelude::*;
 use iron::status;
+use iron::modifiers::Header;
+use hyper::header::{ETag, EntityTag};
 use iron::mime::Mime;
 use router::Router;
 use params::{Params,Value};
@@ -39,16 +41,24 @@ fn check_auth(token: Option<&Token>) -> Option<Response> {
 fn image(req: &mut Request) -> IronResult<Response> {
     let mime: Mime = "image/png".parse().unwrap();
     let router = req.extensions.get::<Router>().unwrap();
-    let image;
-    match router.find("image") {
-        Some(query) => image = query,
+    let image = match router.find("image") {
+        Some(query) => query,
         _ => return Ok(Response::with((status::BadRequest, "Image not specified\n"))),
+    };
+
+    let timestamp = match fs::metadata(image) {
+        Ok(meta) => format!("{:X}", meta.modified().unwrap().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs()),
+        _ => return Ok(Response::with((status::NotFound, "Image not found\n"))),
+    };
+
+    if Some(timestamp.as_ref()) == router.find("ETag") {
+        return Ok(Response::with((status::NotModified, Header(ETag(EntityTag::new(true, timestamp))))));
     }
-    let mut f;
-    match File::open(format!("images/{}", image)) {
-        Ok(file) => f = file,
-        Err(_) => return Ok(Response::with((status::NotFound, "Image not found\n"))),
-    }
+    
+    let mut f = match File::open(format!("images/{}", image)) {
+        Ok(file) => file,
+        _ => return Ok(Response::with((status::NotFound, "Image not found\n"))),
+    };
     let mut data = Vec::new();
     f.read_to_end(&mut data).unwrap();
     return Ok(Response::with((status::Ok, mime, data)));
