@@ -2,15 +2,19 @@ extern crate iron;
 extern crate router;
 extern crate params;
 #[macro_use] extern crate hyper;
+extern crate serde_json;
+extern crate liquid;
 
 use iron::prelude::*;
 use iron::status;
 use iron::mime::Mime;
 use router::Router;
 use params::{Params,Value};
+use liquid::{Renderable, Context};
 
 use std::io::{Read,Write};
 use std::fs::File;
+use std::fs;
 
 
 header! { (Token, "Token") => [String] }
@@ -41,7 +45,7 @@ fn image(req: &mut Request) -> IronResult<Response> {
         _ => return Ok(Response::with((status::BadRequest, "Image not specified\n"))),
     }
     let mut f;
-    match File::open(format!("{}", image)) {
+    match File::open(format!("images/{}", image)) {
         Ok(file) => f = file,
         Err(_) => return Ok(Response::with((status::NotFound, "Image not found\n"))),
     }
@@ -61,33 +65,73 @@ fn upload(req: &mut Request) -> IronResult<Response> {
         Ok(params) => {
             match params.get("image") {
                 Some(&Value::File(ref upload)) => {
-                    if upload.size() > max_len {
-                        return Ok(Response::with((status::BadRequest, format!("Image too large, {:?} > {:?}\n", upload.size(), max_len))));
-                    } else if upload.size() == 0 {
+                    if upload.size > max_len {
+                        return Ok(Response::with((status::BadRequest, format!("Image too large, {:?} > {:?}\n", upload.size, max_len))));
+                    } else if upload.size == 0 {
                         return Ok(Response::with((status::BadRequest,"Empty image data\n"))); 
                     }
 
                     match upload.open() {
                         Ok(mut handle) => { handle.read_to_end(&mut image).unwrap(); },
-                        Err(error) => return Ok(Response::with((status::BadRequest, format!("Failed to read file '{:?}'\n", error)))),
+                        Err(error) => return Ok(Response::with((status::BadRequest, format!("Failed to read file '{:#?}'\n", error)))),
                     }
                 },
                 _ => return Ok(Response::with((status::BadRequest,"No image data found\n"))),
             }
         },
-        Err(error) => return Ok(Response::with((status::BadRequest, format!("Failed to read POST params '{:?}'\n", error)))),
+        Err(error) => return Ok(Response::with((status::BadRequest, format!("Failed to read POST params '{:#?}'\n", error)))),
     }
 
     let hash = hash_image(&image);
-    let mut f = File::create(format!("{:02X}", hash)).unwrap();
+    let mut f = File::create(format!("images/{:02X}", hash)).unwrap();
     f.write_all(&image).unwrap();
     return Ok(Response::with((status::Ok, format!("{:02X}\n", hash))));
 }
 
+fn get_all(_: &mut Request) -> IronResult<Response> {
+    let mut file =  match fs::File::open("./image_index.html") {
+        Ok(f) => f,
+        _ => return Ok(Response::with((status::InternalServerError, "Failed to read index"))),
+    };
+
+    let mut string = String::new();
+    file.read_to_string(&mut string).unwrap();
+
+    let template = match liquid::parse(&string, Default::default()) {
+        Ok(t) => t,
+        Err(e) => return Ok(Response::with((status::InternalServerError, format!("Failed to parse liquid template with error: {:#?}\n", e)))),
+    };
+
+    let mut context = Context::new();
+    let mut images = Vec::new();
+
+    let image_dir = match fs::read_dir("./images") {
+        Ok(dir) => dir,
+        Err(err) => return Ok(Response::with((status::InternalServerError, format!("Failed to read image dir: {:#?}\n", err)))),
+    };
+
+    for file_iter in image_dir {
+        let file = file_iter.unwrap();
+        let meta = fs::metadata(file.path()).unwrap();
+        if meta.is_file() {
+            images.push(file.file_name().into_string().unwrap());
+        }
+    }
+    context.set_val("images", liquid::Value::Array(images.into_iter().map(|e| {liquid::Value::Str(e)} ).collect()));
+    let templated = match template.render(&mut context) {
+        Ok(Some(t)) => t,
+        _ => return Ok(Response::with((status::InternalServerError, "Failed to render liquid template"))),
+    };
+
+    let mime: Mime = "text/html".parse().unwrap();
+    return Ok(Response::with((status::Ok, mime, templated)))
+}
+
 fn main() {
     let mut router = Router::new();
-    router.post("/upload", upload);
-    router.get("/:image", image);
+    router.post("/upload", upload, "upload");
+    router.get("/all", get_all, "get_all");
+    router.get("/:image", image, "get_image");
 
     println!("Listening on localhost:8008");
     Iron::new(router).http("localhost:8008").unwrap();
@@ -97,5 +141,3 @@ fn main() {
         Ok(Response::with((status::Ok, "Hello World\n")))
     }
 }
-
-
