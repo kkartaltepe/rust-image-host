@@ -51,7 +51,7 @@ fn image(req: &mut Request) -> IronResult<Response> {
         Err(e) => return Ok(Response::with((status::InternalServerError, format!("Error getting image timestamp: {:#?}\n", e)))),
     };
     let etag_header = Header(ETag(EntityTag::new(true, timestamp.clone())));
-    if Some(timestamp.as_ref()) == router.find("ETag") {
+    if Some(timestamp.as_ref()) == router.find("If-None-Match") {
         return Ok(Response::with((status::NotModified, etag_header)));
     }
     
