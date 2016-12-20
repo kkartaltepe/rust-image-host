@@ -1,3 +1,8 @@
+use std::env;
+
 fn main() {
-    println!("cargo:rustc-flags=-l user32 -l gdi32");
+	let target = env::var("TARGET").unwrap();
+	if target.contains("windows") {
+    	println!("cargo:rustc-flags=-l user32 -l gdi32");
+	}
 }
