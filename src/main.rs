@@ -46,7 +46,7 @@ fn image(req: &mut Request) -> IronResult<Response> {
         _ => return Ok(Response::with((status::BadRequest, "Image not specified\n"))),
     };
 
-    let timestamp = match fs::metadata(image) {
+    let timestamp = match fs::metadata(format!("images/{}", image)) {
         Ok(meta) => format!("{:X}", meta.modified().unwrap().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs()),
         Err(e) => return Ok(Response::with((status::InternalServerError, format!("Error getting image timestamp: {:#?}\n", e)))),
     };
